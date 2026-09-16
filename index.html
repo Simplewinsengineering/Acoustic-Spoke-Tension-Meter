@@ -1,0 +1,1407 @@
+<!DOCTYPE html>
+<html lang="de" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpokeTension Pro - Akustisches Speichen-Tensiometer</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        slate: {
+                            750: '#1e293b',
+                            850: '#0f172a',
+                            950: '#020617'
+                        },
+                        brand: {
+                            cyan: '#06b6d4',
+                            emerald: '#10b981',
+                            amber: '#f59e0b',
+                            rose: '#f43f5e'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <style>
+        input[type=range] {
+            -webkit-appearance: none;
+            background: #334155;
+            border-radius: 8px;
+            height: 6px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 18px;
+            width: 18px;
+            border-radius: 50%;
+            background: #06b6d4;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(6, 182, 212, 0.5);
+            transition: transform 0.1s ease;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.25);
+        }
+        .pulse-glow-emerald {
+            animation: pulseEmerald 2s infinite;
+        }
+        @keyframes pulseEmerald {
+            0%, 100% { box-shadow: 0 0 15px rgba(16, 185, 129, 0.3); }
+            50% { box-shadow: 0 0 30px rgba(16, 185, 129, 0.7); }
+        }
+        .bg-grid-pattern {
+            background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased bg-grid-pattern pb-12 selection:bg-cyan-500 selection:text-slate-950">
+
+    <!-- Header Navbar -->
+    <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur-md sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="p-2 bg-gradient-to-tr from-cyan-500 to-emerald-400 rounded-xl shadow-lg shadow-cyan-500/20 text-slate-950">
+                    <i data-lucide="disc-3" class="w-6 h-6 animate-spin-slow"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg sm:text-xl tracking-tight bg-gradient-to-r from-slate-100 via-cyan-200 to-emerald-300 bg-clip-text text-transparent">
+                        SpokeTension <span class="text-xs px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-mono">PRO</span>
+                    </h1>
+                    <p class="text-[11px] text-slate-400 hidden sm:block">Aktiv-Akustisches Fahrrad-Speichen-Tensiometer</p>
+                </div>
+            </div>
+
+            <!-- Header Status Indicators -->
+            <div class="flex items-center space-x-3">
+                <div id="httpsWarning" class="hidden flex items-center space-x-1 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-medium">
+                    <i data-lucide="shield-alert" class="w-3.5 h-3.5"></i>
+                    <span>HTTPS erforderlich</span>
+                </div>
+
+                <div id="micStatusBadge" class="flex items-center space-x-2 px-3 py-1 rounded-full bg-slate-800 border border-slate-700 text-xs font-medium text-slate-400">
+                    <span id="statusDot" class="w-2.5 h-2.5 rounded-full bg-slate-500"></span>
+                    <span id="statusText">Mikrofon Bereit</span>
+                </div>
+
+                <button onclick="toggleModal('helpModal')" class="p-2 text-slate-400 hover:text-cyan-400 hover:bg-slate-800 rounded-lg transition-colors flex items-center space-x-1 text-xs font-medium" title="Hilfe & Diagnose">
+                    <i data-lucide="help-circle" class="w-5 h-5"></i>
+                    <span class="hidden md:inline">Anleitung</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Audio Context Resume Banner (Shown when Audio Context is suspended by browser policy) -->
+    <div id="audioContextBanner" class="hidden bg-cyan-950/80 border-b border-cyan-800 px-4 py-2 text-xs text-cyan-200 text-center flex items-center justify-center space-x-2">
+        <i data-lucide="volume-x" class="w-4 h-4 text-cyan-400"></i>
+        <span>Browser hat Audio blockiert. Klicke irgendwo auf die Seite oder starte das Mikrofon.</span>
+        <button onclick="resumeAudioContext()" class="ml-2 px-2.5 py-0.5 bg-cyan-500 text-slate-950 font-bold rounded hover:bg-cyan-400">Aktivieren</button>
+    </div>
+
+    <!-- Main Container Layout -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 space-y-6">
+
+        <!-- Top Row Grid: Physics Parameters (5 Cols) vs Audio Measurement (7 Cols) -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+            <!-- LEFT PANEL: Parameters & Physics Input -->
+            <div class="lg:col-span-5 bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl space-y-5">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <h2 class="font-semibold text-base flex items-center space-x-2 text-cyan-400">
+                        <i data-lucide="sliders" class="w-4 h-4"></i>
+                        <span>Speichen-Physik & Parameter</span>
+                    </h2>
+                    <span class="text-[11px] text-slate-500 font-mono">Formel: T = 4·μ·L²·f²</span>
+                </div>
+
+                <!-- Presets Dropdown -->
+                <div class="space-y-1.5">
+                    <label for="presetSelect" class="block text-xs font-medium text-slate-300">Speichen-Typ Presets</label>
+                    <select id="presetSelect" onchange="applyPreset()" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 focus:ring-2 focus:ring-cyan-500 focus:outline-none">
+                        <option value="rund_20">Rundspeiche 2.0 mm (Standard Edelstahl)</option>
+                        <option value="rund_18">Rundspeiche 1.8 mm (Double Butted Mitte)</option>
+                        <option value="rund_15">Rundspeiche 1.5 mm (Thin Butted Mitte)</option>
+                        <option value="rund_23">Rundspeiche 2.3 mm (E-Bike / Cargo)</option>
+                        <option value="sapim_cxray">Aero Sapim CX-Ray / DT Aerolite (1.6 mm² Äquiv.)</option>
+                        <option value="dt_aero_comp">Aero DT Aero Comp (2.3 mm² Äquiv.)</option>
+                        <option value="titan_20">Titan-Speiche 2.0 mm</option>
+                        <option value="alu_20">Aluminium-Speiche 2.0 mm</option>
+                        <option value="custom">-- Benutzerdefiniert --</option>
+                    </select>
+                </div>
+
+                <!-- Length Slider & Input -->
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center text-xs">
+                        <label for="spokeLength" class="font-medium text-slate-300 flex items-center space-x-1">
+                            <span>Freie Schwingungslänge ($L$)</span>
+                            <button onclick="toggleModal('lengthHelpModal')" class="text-cyan-400 hover:text-cyan-300" title="Wo messen?">
+                                <i data-lucide="info" class="w-3.5 h-3.5"></i>
+                            </button>
+                        </label>
+                        <div class="flex items-center space-x-1">
+                            <input type="number" id="spokeLengthNum" value="260" min="120" max="340" step="1" oninput="syncSlider('spokeLength', this.value)" class="w-16 bg-slate-800 border border-slate-700 rounded-lg px-2 py-0.5 text-right text-xs font-mono text-cyan-400 focus:outline-none focus:ring-1 focus:ring-cyan-500">
+                            <span class="text-slate-400">mm</span>
+                        </div>
+                    </div>
+                    <input type="range" id="spokeLength" min="120" max="340" value="260" step="1" oninput="syncNumInput('spokeLengthNum', this.value)" class="w-full">
+                    <p class="text-[10px] text-slate-500">Messung von Nabenflansch / Kreuzungspunkt bis zum Nippelanfang.</p>
+                </div>
+
+                <!-- Diameter Slider & Input -->
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center text-xs">
+                        <label for="spokeDiameter" class="font-medium text-slate-300">Speichendurchmesser ($d$)</label>
+                        <div class="flex items-center space-x-1">
+                            <input type="number" id="spokeDiameterNum" value="2.00" min="0.80" max="3.50" step="0.05" oninput="syncSlider('spokeDiameter', this.value)" class="w-16 bg-slate-800 border border-slate-700 rounded-lg px-2 py-0.5 text-right text-xs font-mono text-cyan-400 focus:outline-none focus:ring-1 focus:ring-cyan-500">
+                            <span class="text-slate-400">mm</span>
+                        </div>
+                    </div>
+                    <input type="range" id="spokeDiameter" min="0.80" max="3.50" value="2.00" step="0.05" oninput="syncNumInput('spokeDiameterNum', this.value)" class="w-full">
+                </div>
+
+                <!-- Material Density & Target Tension Row -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="space-y-1">
+                        <label for="materialSelect" class="block text-xs font-medium text-slate-300">Material & Dichte ($\rho$)</label>
+                        <select id="materialSelect" onchange="updateDensityFromMaterial()" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-slate-100 focus:ring-2 focus:ring-cyan-500 focus:outline-none">
+                            <option value="7900">Edelstahl (7900 kg/m³)</option>
+                            <option value="7850">Stahl Standard (7850 kg/m³)</option>
+                            <option value="4430">Titan (4430 kg/m³)</option>
+                            <option value="2700">Aluminium (2700 kg/m³)</option>
+                            <option value="1600">Carbon (1600 kg/m³)</option>
+                        </select>
+                    </div>
+                    <div class="space-y-1">
+                        <label for="targetTension" class="block text-xs font-medium text-slate-300">Zielspannung ($T_\text{ziel}$)</label>
+                        <input type="number" id="targetTension" value="1000" step="50" min="300" max="2200" oninput="recalculatePhysics()" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-slate-100 font-mono text-emerald-400 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <!-- Calculated Linear Mass & Target Tone Generator Box -->
+                <div class="bg-slate-950/70 rounded-xl p-3.5 border border-slate-800/80 space-y-2.5 text-xs">
+                    <div class="flex justify-between text-slate-400">
+                        <span>Lin. Massendichte ($\mu$):</span>
+                        <span id="linearMassDisplay" class="font-mono text-slate-200">24.82 g/m</span>
+                    </div>
+                    <div class="flex justify-between text-slate-400">
+                        <span>Zielton-Frequenz ($f_\text{ziel}$):</span>
+                        <span id="targetFreqDisplay" class="font-mono text-cyan-300 font-bold">-- Hz</span>
+                    </div>
+
+                    <!-- Target Audio Pitch Audio Player -->
+                    <div class="pt-1 border-t border-slate-800/80 flex items-center justify-between">
+                        <span class="text-[11px] text-slate-400">Zielton als Referenz anhören:</span>
+                        <button id="playTargetToneBtn" onclick="toggleTargetTone()" class="px-3 py-1 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/30 rounded-lg font-semibold text-xs flex items-center space-x-1.5 transition-colors">
+                            <i data-lucide="volume-2" class="w-3.5 h-3.5"></i>
+                            <span id="toneBtnText">Zielton Abspielen</span>
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- RIGHT PANEL: Pitch Detector, Tension Gauge & Visualizers -->
+            <div class="lg:col-span-7 bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl flex flex-col justify-between space-y-5">
+                
+                <!-- Mic Control Header Bar -->
+                <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-4">
+                    <div class="flex items-center space-x-3">
+                        <button id="micToggleBtn" onclick="toggleMicrophone()" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-bold text-sm shadow-lg shadow-emerald-500/20 transition-all flex items-center space-x-2 pulse-glow-emerald">
+                            <i data-lucide="mic" class="w-5 h-5"></i>
+                            <span id="micBtnText">Mikrofon Starten</span>
+                        </button>
+                        
+                        <button id="freezeBtn" onclick="toggleFreeze()" disabled class="px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed border border-slate-700 text-xs font-semibold flex items-center space-x-1.5 transition-colors">
+                            <i data-lucide="snowflake" class="w-4 h-4 text-cyan-400"></i>
+                            <span id="freezeBtnText">Einfrieren</span>
+                        </button>
+                    </div>
+
+                    <label class="flex items-center space-x-2 text-xs text-slate-300 cursor-pointer bg-slate-800/80 hover:bg-slate-800 px-3 py-2 rounded-xl border border-slate-700/80 transition-colors">
+                        <input type="checkbox" id="autoSaveToggle" checked class="rounded bg-slate-900 border-slate-600 text-cyan-500 focus:ring-cyan-500 w-4 h-4">
+                        <span>Auto-Speichern bei Zupfen</span>
+                    </label>
+                </div>
+
+                <!-- Frequency & Tension Big Gauge Display -->
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+                    
+                    <!-- Frequenz Display Box -->
+                    <div class="md:col-span-5 bg-slate-950/90 border border-slate-800 rounded-2xl p-4 text-center space-y-1 relative overflow-hidden">
+                        <div class="text-[11px] font-medium uppercase tracking-wider text-slate-400">Gemessene Frequenz</div>
+                        <div class="flex items-baseline justify-center space-x-1">
+                            <span id="freqDisplay" class="text-4xl sm:text-5xl font-black font-mono tracking-tight text-slate-100">0.0</span>
+                            <span class="text-sm font-semibold text-cyan-400">Hz</span>
+                        </div>
+                        <div class="flex items-center justify-between text-[10px] text-slate-500 pt-1 px-2 border-t border-slate-900">
+                            <span>Klarheit: <span id="clarityDisplay" class="font-mono text-slate-300">0%</span></span>
+                            <span>Pegel: <span id="dbDisplay" class="font-mono text-slate-300">-60 dB</span></span>
+                        </div>
+                    </div>
+
+                    <!-- Calculated Tension Display Box -->
+                    <div class="md:col-span-7 bg-slate-950/90 border border-slate-800 rounded-2xl p-4 space-y-2.5">
+                        <div class="text-[11px] font-medium uppercase tracking-wider text-slate-400 text-center sm:text-left">Berechnete Speichenspannung</div>
+                        <div class="grid grid-cols-3 gap-2 text-center">
+                            <div class="bg-slate-900/90 rounded-xl p-2 border border-slate-800">
+                                <div class="text-[10px] text-slate-400 uppercase font-semibold">Newton</div>
+                                <div id="tensionNDisplay" class="text-xl sm:text-2xl font-bold font-mono text-emerald-400">0</div>
+                                <div class="text-[9px] text-slate-500">N</div>
+                            </div>
+                            <div class="bg-slate-900/90 rounded-xl p-2 border border-slate-800">
+                                <div class="text-[10px] text-slate-400 uppercase font-semibold">Kilogramm</div>
+                                <div id="tensionKgfDisplay" class="text-xl sm:text-2xl font-bold font-mono text-cyan-400">0.0</div>
+                                <div class="text-[9px] text-slate-500">kgf</div>
+                            </div>
+                            <div class="bg-slate-900/90 rounded-xl p-2 border border-slate-800">
+                                <div class="text-[10px] text-slate-400 uppercase font-semibold">Pfund-Kraft</div>
+                                <div id="tensionLbfDisplay" class="text-xl sm:text-2xl font-bold font-mono text-slate-300">0.0</div>
+                                <div class="text-[9px] text-slate-500">lbf</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Target Tension Visual Gauge Bar -->
+                <div class="space-y-1.5">
+                    <div class="flex justify-between text-xs text-slate-400 font-medium">
+                        <span>Abweichung vom Zielwert</span>
+                        <span id="gaugeStatusText" class="font-mono text-slate-400">-- %</span>
+                    </div>
+                    <div class="relative w-full h-4 bg-slate-950 rounded-full border border-slate-800 overflow-hidden">
+                        <!-- Target Zones -->
+                        <div class="absolute inset-y-0 left-0 w-[35%] bg-rose-900/40"></div>
+                        <div class="absolute inset-y-0 left-[35%] w-[10%] bg-amber-900/40"></div>
+                        <div class="absolute inset-y-0 left-[45%] w-[10%] bg-emerald-900/60"></div>
+                        <div class="absolute inset-y-0 left-[55%] w-[10%] bg-amber-900/40"></div>
+                        <div class="absolute inset-y-0 right-0 w-[35%] bg-rose-900/40"></div>
+
+                        <div class="absolute inset-y-0 left-1/2 w-0.5 bg-slate-300 z-10"></div>
+                        <div id="gaugeMarker" class="absolute top-0 bottom-0 w-2.5 bg-cyan-400 border border-slate-900 rounded-full shadow-lg -ml-1.25 transition-all duration-200 left-1/2 opacity-0"></div>
+                    </div>
+                    <div class="flex justify-between text-[10px] text-slate-500 font-mono">
+                        <span>Zu locker (-30%)</span>
+                        <span class="text-emerald-400 font-bold">100% Ziel</span>
+                        <span>Zu fest (+30%)</span>
+                    </div>
+                </div>
+
+                <!-- Live Combined Visualizer Canvas & Pluck Spike Notice -->
+                <div class="space-y-1">
+                    <div class="flex items-center justify-between text-xs text-slate-400">
+                        <span class="flex items-center space-x-1.5">
+                            <i data-lucide="activity" class="w-3.5 h-3.5 text-cyan-400"></i>
+                            <span>Oszilloskop & FFT-Spektrum</span>
+                        </span>
+                        <span class="text-[10px] text-slate-500 font-mono">150 Hz - 1200 Hz Bandpass</span>
+                    </div>
+                    <div class="relative h-28 w-full bg-slate-950 border border-slate-800 rounded-xl overflow-hidden">
+                        <canvas id="visualizerCanvas" class="w-full h-full block"></canvas>
+                        <div id="pluckNotice" class="absolute inset-0 bg-emerald-500/15 border-2 border-emerald-400 rounded-xl flex items-center justify-center text-emerald-300 font-bold text-xs uppercase tracking-widest opacity-0 transition-opacity duration-200 pointer-events-none">
+                            ⚡ Speichen-Zupfer Erfasst!
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Save Reading Button -->
+                <button onclick="saveActiveSpokeMeasurement()" class="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-cyan-300 font-semibold text-xs flex items-center justify-center space-x-2 transition-colors">
+                    <i data-lucide="arrow-down-to-line" class="w-4 h-4"></i>
+                    <span>Wert auf ausgewählte Speiche (<span id="activeSpokeBadge">#1 Links</span>) übertragen</span>
+                </button>
+
+            </div>
+        </div>
+
+        <!-- Diagnostic Controls & Fallback Simulator Panel -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
+                <h3 class="font-semibold text-sm flex items-center space-x-2 text-slate-200">
+                    <i data-lucide="terminal" class="w-4 h-4 text-cyan-400"></i>
+                    <span>Mikrofon-Diagnose & Empfindlichkeit (Noise Gate)</span>
+                </h3>
+                <span class="text-xs text-slate-500 font-mono" id="audioContextStateDisplay">AudioContext: Nicht Gestartet</span>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                <!-- Noise Threshold / Noise Gate Slider -->
+                <div class="space-y-1.5 bg-slate-950/70 p-3 rounded-xl border border-slate-800">
+                    <div class="flex justify-between text-slate-300">
+                        <label for="noiseGateSlider" class="font-medium">Rausch-Schwellenwert (Noise Gate)</label>
+                        <span id="noiseGateValueDisplay" class="font-mono text-cyan-400">0.015</span>
+                    </div>
+                    <input type="range" id="noiseGateSlider" min="0.005" max="0.08" step="0.002" value="0.015" oninput="document.getElementById('noiseGateValueDisplay').innerText = this.value" class="w-full">
+                    <p class="text-[10px] text-slate-500">Erhöhen, wenn Nebengeräusche fälschlicherweise als Ton erkannt werden.</p>
+                </div>
+
+                <!-- Pluck Sensitivity Spike Slider -->
+                <div class="space-y-1.5 bg-slate-950/70 p-3 rounded-xl border border-slate-800">
+                    <div class="flex justify-between text-slate-300">
+                        <label for="pluckSensSlider" class="font-medium">Zupf-Erkennung Empfindlichkeit</label>
+                        <span id="pluckSensValueDisplay" class="font-mono text-cyan-400">Medium</span>
+                    </div>
+                    <input type="range" id="pluckSensSlider" min="1" max="5" step="1" value="3" oninput="updatePluckSensDisplay(this.value)" class="w-full">
+                    <p class="text-[10px] text-slate-500">Schwelle für die automatische Auslösung bei Lautstärke-Spitzen.</p>
+                </div>
+
+                <!-- Manual Frequency Simulator Fallback Slider -->
+                <div class="space-y-1.5 bg-slate-950/70 p-3 rounded-xl border border-slate-800">
+                    <div class="flex justify-between text-slate-300">
+                        <label for="manualFreqSlider" class="font-medium">Manuelle Frequenz-Simulation (Test)</label>
+                        <span id="manualFreqValueDisplay" class="font-mono text-emerald-400">Off</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <input type="range" id="manualFreqSlider" min="200" max="1000" step="1" value="450" oninput="simulateFrequency(this.value)" class="w-full">
+                        <button onclick="resetSimulatedFrequency()" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded text-[10px]">Aus</button>
+                    </div>
+                    <p class="text-[10px] text-slate-500">Erlaubt das manuelles Testen ohne Mikrofon.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Wheel Building Protocol & Interactive Spoke Chart -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl space-y-6">
+            
+            <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                <div>
+                    <h2 class="font-bold text-lg text-slate-100 flex items-center space-x-2">
+                        <i data-lucide="file-spreadsheet" class="w-5 h-5 text-emerald-400"></i>
+                        <span>Laufrad-Einspeich-Protokoll</span>
+                    </h2>
+                    <p class="text-xs text-slate-400">Speicherung & Auswertung der Spannungsverteilung aller Speichen.</p>
+                </div>
+
+                <div class="flex items-center space-x-2">
+                    <button onclick="exportCSV()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-medium flex items-center space-x-1.5 transition-colors">
+                        <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                        <span>CSV Export</span>
+                    </button>
+                    <button onclick="resetWheelLog()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-rose-900/40 hover:text-rose-300 text-slate-400 border border-slate-700 text-xs font-medium flex items-center space-x-1.5 transition-colors">
+                        <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                        <span>Zurücksetzen</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Configuration Options for Wheel -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 bg-slate-950/70 p-4 rounded-xl border border-slate-800">
+                <div>
+                    <label for="wheelName" class="block text-xs font-medium text-slate-400">Laufrad Name / Notiz</label>
+                    <input type="text" id="wheelName" value="Hinterrad 28 Zoll" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-slate-200 mt-1 focus:outline-none focus:ring-1 focus:ring-cyan-500">
+                </div>
+                <div>
+                    <label for="spokeCountSelect" class="block text-xs font-medium text-slate-400">Speichenanzahl</label>
+                    <select id="spokeCountSelect" onchange="changeSpokeCount()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-slate-200 mt-1 focus:outline-none focus:ring-1 focus:ring-cyan-500">
+                        <option value="16">16 Speichen</option>
+                        <option value="20">20 Speichen</option>
+                        <option value="24">24 Speichen</option>
+                        <option value="28">28 Speichen</option>
+                        <option value="32" selected>32 Speichen (Standard)</option>
+                        <option value="36">36 Speichen</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="targetLeftN" class="block text-xs font-medium text-slate-400">Ziel Links / NDS (N)</label>
+                    <input type="number" id="targetLeftN" value="800" step="50" onchange="updateSummaryStats()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-slate-200 mt-1 focus:outline-none focus:ring-1 focus:ring-cyan-500">
+                </div>
+                <div>
+                    <label for="targetRightN" class="block text-xs font-medium text-slate-400">Ziel Rechts / DS (N)</label>
+                    <input type="number" id="targetRightN" value="1100" step="50" onchange="updateSummaryStats()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-slate-200 mt-1 focus:outline-none focus:ring-1 focus:ring-cyan-500">
+                </div>
+            </div>
+
+            <!-- Polar Diagram & Spoke Protocol Table -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+                
+                <!-- Interactive Canvas Wheel Diagram -->
+                <div class="lg:col-span-5 flex flex-col items-center justify-center bg-slate-950/80 border border-slate-800 rounded-2xl p-4 relative">
+                    <div class="text-xs font-semibold text-slate-400 mb-2">Visuelles Polardiagramm</div>
+                    <div class="relative w-full max-w-[280px] aspect-square">
+                        <canvas id="wheelCanvas" width="280" height="280" class="w-full h-full cursor-pointer"></canvas>
+                    </div>
+                    <p class="text-[11px] text-slate-500 mt-2 text-center">Klicke im Diagramm auf eine Speiche, um sie auszuwählen.</p>
+                </div>
+
+                <!-- Side Balance Statistics & Spoke Table -->
+                <div class="lg:col-span-7 space-y-4">
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <!-- Links (NDS) Stats Card -->
+                        <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-3.5 space-y-1.5">
+                            <div class="flex justify-between items-center border-b border-slate-800 pb-1">
+                                <span class="text-xs font-bold text-cyan-400">Links (Nicht-Antrieb)</span>
+                                <span id="leftCountBadge" class="text-[10px] font-mono bg-cyan-950 text-cyan-300 px-1.5 py-0.5 rounded border border-cyan-800">0/16</span>
+                            </div>
+                            <div class="space-y-1 text-xs">
+                                <div class="flex justify-between text-slate-400">
+                                    <span>Schnitt:</span>
+                                    <span id="leftAvgN" class="font-mono text-slate-100 font-bold">0 N</span>
+                                </div>
+                                <div class="flex justify-between text-slate-400">
+                                    <span>Min / Max:</span>
+                                    <span id="leftMinMax" class="font-mono text-slate-300">-- / -- N</span>
+                                </div>
+                                <div class="flex justify-between text-slate-400">
+                                    <span>Gleichmäßigkeit:</span>
+                                    <span id="leftDevPercent" class="font-mono text-emerald-400">± 0%</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Rechts (DS) Stats Card -->
+                        <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-3.5 space-y-1.5">
+                            <div class="flex justify-between items-center border-b border-slate-800 pb-1">
+                                <span class="text-xs font-bold text-emerald-400">Rechts (Antriebsseite)</span>
+                                <span id="rightCountBadge" class="text-[10px] font-mono bg-emerald-950 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-800">0/16</span>
+                            </div>
+                            <div class="space-y-1 text-xs">
+                                <div class="flex justify-between text-slate-400">
+                                    <span>Schnitt:</span>
+                                    <span id="rightAvgN" class="font-mono text-slate-100 font-bold">0 N</span>
+                                </div>
+                                <div class="flex justify-between text-slate-400">
+                                    <span>Min / Max:</span>
+                                    <span id="rightMinMax" class="font-mono text-slate-300">-- / -- N</span>
+                                </div>
+                                <div class="flex justify-between text-slate-400">
+                                    <span>Gleichmäßigkeit:</span>
+                                    <span id="rightDevPercent" class="font-mono text-emerald-400">± 0%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Spoke Dynamic Protocol Table -->
+                    <div class="border border-slate-800 rounded-xl overflow-hidden bg-slate-950/60">
+                        <div class="max-h-56 overflow-y-auto">
+                            <table class="w-full text-left text-xs">
+                                <thead class="bg-slate-900 text-slate-400 sticky top-0 border-b border-slate-800 font-semibold">
+                                    <tr>
+                                        <th class="p-2 text-center">#</th>
+                                        <th class="p-2">Seite</th>
+                                        <th class="p-2 text-right">Frequenz</th>
+                                        <th class="p-2 text-right">Spannung (N)</th>
+                                        <th class="p-2 text-right">kgf</th>
+                                        <th class="p-2 text-right">Ziel-Abw.</th>
+                                        <th class="p-2 text-center">Aktion</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="spokeTableBody" class="divide-y divide-slate-800/60 font-mono">
+                                    <!-- Dynamic Rows Generated via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Instruction & Troubleshooting Modal -->
+    <div id="helpModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+            
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h3 class="text-lg font-bold text-cyan-400 flex items-center space-x-2">
+                    <i data-lucide="book-open" class="w-5 h-5"></i>
+                    <span>Bedienung & Fehlerdiagnose</span>
+                </h3>
+                <button onclick="toggleModal('helpModal')" class="text-slate-400 hover:text-slate-100 p-1">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4 text-xs text-slate-300 leading-relaxed">
+                
+                <!-- Step 1 -->
+                <div class="space-y-1.5">
+                    <h4 class="font-bold text-slate-100 text-sm flex items-center space-x-2">
+                        <span class="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 text-[11px] flex items-center justify-center font-mono">1</span>
+                        <span>Warum filterte der Browser das Speichengeräusch bisher?</span>
+                    </h4>
+                    <p class="text-slate-400">
+                        Moderne Browser aktivieren standardmäßig eine **Echounterdrückung (echoCancellation)** und **Rauschunterdrückung (noiseSuppression)**. Da das Zupfen einer Speiche sehr metallisch und kurz ist, wird es vom Algorithmus oft als "Störgeräusch" herausgefiltert. In dieser Version sind sämtliche Filter auf Treue-Audio geschaltet.
+                    </p>
+                </div>
+
+                <!-- Step 2 -->
+                <div class="space-y-1.5">
+                    <h4 class="font-bold text-slate-100 text-sm flex items-center space-x-2">
+                        <span class="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 text-[11px] flex items-center justify-center font-mono">2</span>
+                        <span>Mikrofon reagiert nicht / Kein Ausschlag?</span>
+                    </h4>
+                    <ul class="list-disc list-inside space-y-1 text-slate-400 pl-2">
+                        <li><strong class="text-slate-200">HTTPS Pflicht:</strong> Web Audio Mikrofone funktionieren nur über sichere Verbindungen (<code class="text-cyan-400">https://</code>) oder <code class="text-cyan-400">localhost</code>.</li>
+                        <li><strong class="text-slate-200">Berechtigung prüfen:</strong> Stelle sicher, dass der Browser die Mikrofon-Freigabe erteilt hat.</li>
+                        <li><strong class="text-slate-200">AudioContext blockiert:</strong> Klicke einmal auf die Seite, um Audio im Browser zu entsperren.</li>
+                    </ul>
+                </div>
+
+                <!-- Step 3 -->
+                <div class="space-y-1.5">
+                    <h4 class="font-bold text-slate-100 text-sm flex items-center space-x-2">
+                        <span class="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 text-[11px] flex items-center justify-center font-mono">3</span>
+                        <span>Tipps für genaue Messergebnisse</span>
+                    </h4>
+                    <ul class="list-disc list-inside space-y-1 text-slate-400 pl-2">
+                        <li>Mikrofon **3-5 cm** dicht an die Mitte der freien Speiche halten.</li>
+                        <li>Speiche mit Fingernagel oder Plektrum kurz und sauber anzupfen.</li>
+                        <li>Die benachbarte gekreuzte Speiche leicht mit einem Finger dämpfen, um Resonanzen zu vermeiden.</li>
+                    </ul>
+                </div>
+
+            </div>
+
+            <div class="pt-3 border-t border-slate-800 flex justify-end">
+                <button onclick="toggleModal('helpModal')" class="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-xl transition-colors">
+                    Schließen
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Spoke Length Help Modal -->
+    <div id="lengthHelpModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-5 shadow-2xl space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                <h3 class="text-sm font-bold text-cyan-400">Messung der freien Länge (L)</h3>
+                <button onclick="toggleModal('lengthHelpModal')" class="text-slate-400 hover:text-slate-100">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+            <div class="text-xs text-slate-300 space-y-2 leading-relaxed">
+                <p>
+                    Die **freie Schwingungslänge ($L$)** ist der Teil der Speiche, der ungestört frei schwingen kann.
+                </p>
+                <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 text-slate-400 space-y-1">
+                    <div>• <strong>Bei ungekreuzten Speichen (Radial):</strong> Vom Nabenflansch bis zum Beginn des Speichennippels.</div>
+                    <div>• <strong>Bei gekreuzten Speichen (2x, 3x gekreuzt):</strong> Vom letzten Berührungspunkt / Kreuzungspunkt der Speichen bis zum Nippelanfang an der Felge.</div>
+                </div>
+                <p class="text-slate-400">
+                    Typische Werte liegen zwischen **180 mm und 280 mm**.
+                </p>
+            </div>
+            <div class="flex justify-end">
+                <button onclick="toggleModal('lengthHelpModal')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-lg">Verstanden</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global State & Audio Nodes
+        let audioCtx = null;
+        let analyser = null;
+        let microphoneStream = null;
+        let isAudioActive = false;
+        let isFrozen = false;
+        let animationFrameId = null;
+
+        // Current Measurement Cache
+        let currentFrequency = 0;
+        let currentClarity = 0;
+        let currentRms = 0;
+        let currentDb = -60;
+        let currentTensionN = 0;
+        let currentTensionKgf = 0;
+        let currentTensionLbf = 0;
+
+        // Simulator State
+        let isSimulating = false;
+
+        // Tone Generator Oscillator Node
+        let targetToneOsc = null;
+        let targetToneGain = null;
+        let isPlayingTone = false;
+
+        // Wheel Building Protocol State
+        let activeSpokeIndex = 0;
+        let spokeCount = 32;
+        let spokesData = [];
+        let lastPluckTime = 0;
+
+        // Presets Configuration Map
+        const PRESETS = {
+            'rund_20': { d: 2.00, density: 7900, name: 'Rundspeiche 2.0 mm' },
+            'rund_18': { d: 1.80, density: 7900, name: 'Rundspeiche 1.8 mm' },
+            'rund_15': { d: 1.50, density: 7900, name: 'Rundspeiche 1.5 mm' },
+            'rund_23': { d: 2.30, density: 7900, name: 'Rundspeiche 2.3 mm' },
+            'sapim_cxray': { d: 1.43, density: 7900, name: 'Aero Sapim CX-Ray' },
+            'dt_aero_comp': { d: 1.72, density: 7900, name: 'Aero DT Aero Comp' },
+            'titan_20': { d: 2.00, density: 4430, name: 'Titan-Speiche 2.0 mm' },
+            'alu_20': { d: 2.00, density: 2700, name: 'Aluminium-Speiche 2.0 mm' },
+            'custom': { d: 2.00, density: 7900, name: 'Benutzerdefiniert' }
+        };
+
+        function toggleModal(id) {
+            const el = document.getElementById(id);
+            if (el) el.classList.toggle('hidden');
+        }
+
+        function syncSlider(sliderId, value) {
+            document.getElementById(sliderId).value = value;
+            document.getElementById('presetSelect').value = 'custom';
+            recalculatePhysics();
+        }
+
+        function syncNumInput(numInputId, value) {
+            document.getElementById(numInputId).value = parseFloat(value).toFixed(2);
+            document.getElementById('presetSelect').value = 'custom';
+            recalculatePhysics();
+        }
+
+        function applyPreset() {
+            const key = document.getElementById('presetSelect').value;
+            if (key in PRESETS && key !== 'custom') {
+                const preset = PRESETS[key];
+                document.getElementById('spokeDiameter').value = preset.d;
+                document.getElementById('spokeDiameterNum').value = preset.d.toFixed(2);
+                document.getElementById('materialSelect').value = preset.density.toString();
+            }
+            recalculatePhysics();
+        }
+
+        function updateDensityFromMaterial() {
+            document.getElementById('presetSelect').value = 'custom';
+            recalculatePhysics();
+        }
+
+        function updatePluckSensDisplay(val) {
+            const labels = ['Sehr Niedrig', 'Niedrig', 'Medium', 'Hoch', 'Sehr Hoch'];
+            document.getElementById('pluckSensValueDisplay').innerText = labels[val - 1] || 'Medium';
+        }
+
+        // Formula: T = 4 * mu * L^2 * f^2
+        // mu = density * pi * (d/2)^2
+        function recalculatePhysics() {
+            const lengthMm = parseFloat(document.getElementById('spokeLengthNum').value) || 260;
+            const diameterMm = parseFloat(document.getElementById('spokeDiameterNum').value) || 2.0;
+            const density = parseFloat(document.getElementById('materialSelect').value) || 7900;
+            const targetN = parseFloat(document.getElementById('targetTension').value) || 1000;
+
+            const L = lengthMm / 1000.0; // meters
+            const d = diameterMm / 1000.0; // meters
+            const area = Math.PI * Math.pow(d / 2.0, 2); // m^2
+            const linearMass = density * area; // kg/m (mu)
+
+            document.getElementById('linearMassDisplay').innerText = (linearMass * 1000.0).toFixed(2) + ' g/m';
+
+            // Calculate Target Frequency for Target Tension
+            // f_target = sqrt( T_target / (4 * mu * L^2) )
+            let targetFreq = 0;
+            if (linearMass > 0 && L > 0 && targetN > 0) {
+                targetFreq = Math.sqrt(targetN / (4.0 * linearMass * Math.pow(L, 2)));
+                document.getElementById('targetFreqDisplay').innerText = `${targetFreq.toFixed(1)} Hz`;
+            } else {
+                document.getElementById('targetFreqDisplay').innerText = '-- Hz';
+            }
+
+            // Update Target Tone Generator frequency if playing
+            if (isPlayingTone && targetToneOsc && audioCtx) {
+                targetToneOsc.frequency.setValueAtTime(targetFreq, audioCtx.currentTime);
+            }
+
+            // Compute Current Tension from measured frequency
+            if (currentFrequency > 0) {
+                const tensionN = 4.0 * linearMass * Math.pow(L, 2) * Math.pow(currentFrequency, 2);
+                currentTensionN = Math.round(tensionN);
+                currentTensionKgf = parseFloat((tensionN / 9.80665).toFixed(1));
+                currentTensionLbf = parseFloat((tensionN / 4.44822).toFixed(1));
+
+                document.getElementById('tensionNDisplay').innerText = currentTensionN;
+                document.getElementById('tensionKgfDisplay').innerText = currentTensionKgf;
+                document.getElementById('tensionLbfDisplay').innerText = currentTensionLbf;
+
+                // Update Visual Gauge Position
+                const devPercent = ((tensionN - targetN) / targetN) * 100.0;
+                const marker = document.getElementById('gaugeMarker');
+                const gaugeStatusText = document.getElementById('gaugeStatusText');
+
+                marker.style.opacity = '1';
+                let markerPos = 50 + (devPercent / 30.0) * 50.0;
+                markerPos = Math.max(2, Math.min(98, markerPos));
+                marker.style.left = `${markerPos}%`;
+
+                const sign = devPercent >= 0 ? '+' : '';
+                gaugeStatusText.innerText = `${sign}${devPercent.toFixed(1)}%`;
+                if (Math.abs(devPercent) <= 10) {
+                    gaugeStatusText.className = 'font-mono text-emerald-400 font-bold';
+                } else if (Math.abs(devPercent) <= 20) {
+                    gaugeStatusText.className = 'font-mono text-amber-400 font-bold';
+                } else {
+                    gaugeStatusText.className = 'font-mono text-rose-400 font-bold';
+                }
+            }
+        }
+
+        function autoCorrelate(buf, sampleRate, noiseGateThreshold) {
+            const SIZE = buf.length;
+            let rms = 0;
+
+            for (let i = 0; i < SIZE; i++) {
+                const val = buf[i];
+                rms += val * val;
+            }
+            rms = Math.sqrt(rms / SIZE);
+
+            const db = 20 * Math.log10(Math.max(rms, 0.00001));
+
+            if (rms < noiseGateThreshold) {
+                return { freq: -1, clarity: 0, rms: rms, db: db };
+            }
+
+            // Bandpass Limits in time lag (150 Hz to 1200 Hz)
+            const minLag = Math.floor(sampleRate / 1200);
+            const maxLag = Math.ceil(sampleRate / 150);
+
+            let r0 = 0;
+            for (let i = 0; i < SIZE - maxLag; i++) {
+                r0 += buf[i] * buf[i];
+            }
+            if (r0 === 0) return { freq: -1, clarity: 0, rms: rms, db: db };
+
+            const correlations = new Float32Array(maxLag + 2);
+            for (let lag = minLag - 1; lag <= maxLag + 1; lag++) {
+                let sum = 0;
+                for (let i = 0; i < SIZE - maxLag; i++) {
+                    sum += buf[i] * buf[i + lag];
+                }
+                correlations[lag] = sum;
+            }
+
+            let bestLag = -1;
+            let maxCorr = -1;
+
+            for (let lag = minLag; lag <= maxLag; lag++) {
+                if (correlations[lag] > maxCorr && correlations[lag] > correlations[lag - 1] && correlations[lag] > correlations[lag + 1]) {
+                    maxCorr = correlations[lag];
+                    bestLag = lag;
+                }
+            }
+
+            if (bestLag === -1 || maxCorr <= 0) {
+                return { freq: -1, clarity: 0, rms: rms, db: db };
+            }
+
+            // Parabolic Interpolation for sub-Hz accuracy
+            const y1 = correlations[bestLag - 1];
+            const y2 = correlations[bestLag];
+            const y3 = correlations[bestLag + 1];
+
+            const denom = (2 * y2 - y1 - y3);
+            let delta = 0;
+            if (denom !== 0) {
+                delta = (y3 - y1) / (2 * denom);
+            }
+
+            const refinedLag = bestLag + delta;
+            const freq = sampleRate / refinedLag;
+            const clarity = Math.min(1.0, maxCorr / r0);
+
+            return { freq: freq, clarity: clarity, rms: rms, db: db };
+        }
+
+        async function ensureAudioContext() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                await audioCtx.resume();
+            }
+            updateAudioContextDisplay();
+        }
+
+        function updateAudioContextDisplay() {
+            const disp = document.getElementById('audioContextStateDisplay');
+            const banner = document.getElementById('audioContextBanner');
+            if (audioCtx) {
+                disp.innerText = `AudioContext: ${audioCtx.state} (${audioCtx.sampleRate} Hz)`;
+                if (audioCtx.state === 'suspended') {
+                    banner.classList.remove('hidden');
+                } else {
+                    banner.classList.add('hidden');
+                }
+            }
+        }
+
+        async function resumeAudioContext() {
+            await ensureAudioContext();
+        }
+
+        async function toggleMicrophone() {
+            if (isAudioActive) {
+                stopMicrophone();
+            } else {
+                await startMicrophone();
+            }
+        }
+
+        async function startMicrophone() {
+            try {
+                await ensureAudioContext();
+
+                // CRITICAL FIX: Disable browser noise cancellation & AGC to preserve metallic pluck transients
+                microphoneStream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: false,
+                        noiseSuppression: false,
+                        autoGainControl: false
+                    }
+                });
+
+                const source = audioCtx.createMediaStreamSource(microphoneStream);
+
+                // Highpass Filter (120 Hz) + Lowpass Filter (1500 Hz) Bandpass Stage
+                const highpass = audioCtx.createBiquadFilter();
+                highpass.type = 'highpass';
+                highpass.frequency.value = 120;
+
+                const lowpass = audioCtx.createBiquadFilter();
+                lowpass.type = 'lowpass';
+                lowpass.frequency.value = 1500;
+
+                analyser = audioCtx.createAnalyser();
+                analyser.fftSize = 4096;
+
+                source.connect(highpass);
+                highpass.connect(lowpass);
+                lowpass.connect(analyser);
+
+                isAudioActive = true;
+                isFrozen = false;
+                isSimulating = false;
+
+                document.getElementById('micBtnText').innerText = 'Stoppen';
+                document.getElementById('micToggleBtn').className = 'px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-400 hover:to-red-500 text-slate-100 font-bold text-sm shadow-lg shadow-rose-500/20 transition-all flex items-center space-x-2';
+                document.getElementById('freezeBtn').disabled = false;
+                document.getElementById('statusDot').className = 'w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping';
+                document.getElementById('statusText').innerText = 'Aufnahme Aktiv';
+
+                processAudio();
+            } catch (err) {
+                console.error("Microphone Initialization Error:", err);
+                alert("Fehler beim Zugriff auf das Mikrofon. Bitte vergewissere dich, dass HTTPS verwendet wird und die Mikrofon-Freigabe erteilt wurde.");
+            }
+        }
+
+        function stopMicrophone() {
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            if (microphoneStream) {
+                microphoneStream.getTracks().forEach(track => track.stop());
+            }
+            isAudioActive = false;
+
+            document.getElementById('micBtnText').innerText = 'Mikrofon Starten';
+            document.getElementById('micToggleBtn').className = 'px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-bold text-sm shadow-lg shadow-emerald-500/20 transition-all flex items-center space-x-2 pulse-glow-emerald';
+            document.getElementById('freezeBtn').disabled = true;
+            document.getElementById('statusDot').className = 'w-2.5 h-2.5 rounded-full bg-slate-500';
+            document.getElementById('statusText').innerText = 'Mikrofon Bereit';
+        }
+
+        function toggleFreeze() {
+            isFrozen = !isFrozen;
+            document.getElementById('freezeBtnText').innerText = isFrozen ? 'Freigeben' : 'Einfrieren';
+        }
+
+        function processAudio() {
+            if (!isAudioActive) return;
+
+            const timeBuffer = new Float32Array(analyser.fftSize);
+            analyser.getFloatTimeDomainData(timeBuffer);
+
+            const freqBuffer = new Uint8Array(analyser.frequencyBinCount);
+            analyser.getByteFrequencyData(freqBuffer);
+
+            const noiseGateThreshold = parseFloat(document.getElementById('noiseGateSlider').value) || 0.015;
+
+            if (!isFrozen && !isSimulating) {
+                const result = autoCorrelate(timeBuffer, audioCtx.sampleRate, noiseGateThreshold);
+
+                currentRms = result.rms;
+                currentDb = Math.round(result.db);
+
+                document.getElementById('dbDisplay').innerText = `${currentDb} dB`;
+
+                if (result.freq >= 150 && result.freq <= 1200 && result.clarity > 0.65) {
+                    currentFrequency = parseFloat(result.freq.toFixed(1));
+                    currentClarity = Math.min(100, Math.round(result.clarity * 100));
+
+                    document.getElementById('freqDisplay').innerText = currentFrequency.toFixed(1);
+                    document.getElementById('clarityDisplay').innerText = `${currentClarity}%`;
+
+                    recalculatePhysics();
+
+                    // Pluck Spike Detection Logic
+                    const sensVal = parseInt(document.getElementById('pluckSensSlider').value) || 3;
+                    const sensRmsThreshold = [0.05, 0.035, 0.025, 0.018, 0.012][sensVal - 1];
+
+                    const now = Date.now();
+                    if (result.rms > sensRmsThreshold && result.clarity > 0.78 && (now - lastPluckTime > 750)) {
+                        lastPluckTime = now;
+                        triggerPluckEvent();
+                    }
+                }
+            }
+
+            renderVisualizer(timeBuffer, freqBuffer);
+            animationFrameId = requestAnimationFrame(processAudio);
+        }
+
+        function triggerPluckEvent() {
+            const notice = document.getElementById('pluckNotice');
+            notice.style.opacity = '1';
+            setTimeout(() => { notice.style.opacity = '0'; }, 350);
+
+            playBeepChime();
+
+            if (document.getElementById('autoSaveToggle').checked) {
+                saveActiveSpokeMeasurement();
+            }
+        }
+
+        function playBeepChime() {
+            try {
+                if (!audioCtx) return;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(1200, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.12);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.12);
+            } catch (e) {}
+        }
+
+        function simulateFrequency(val) {
+            isSimulating = true;
+            currentFrequency = parseFloat(val);
+            currentClarity = 98;
+            document.getElementById('manualFreqValueDisplay').innerText = `${val} Hz`;
+            document.getElementById('freqDisplay').innerText = currentFrequency.toFixed(1);
+            document.getElementById('clarityDisplay').innerText = '98%';
+            recalculatePhysics();
+        }
+
+        function resetSimulatedFrequency() {
+            isSimulating = false;
+            document.getElementById('manualFreqValueDisplay').innerText = 'Off';
+        }
+
+        async function toggleTargetTone() {
+            await ensureAudioContext();
+
+            if (isPlayingTone) {
+                stopTargetTone();
+            } else {
+                startTargetTone();
+            }
+        }
+
+        function startTargetTone() {
+            const targetFreqStr = document.getElementById('targetFreqDisplay').innerText;
+            const targetFreq = parseFloat(targetFreqStr);
+
+            if (!targetFreq || isNaN(targetFreq)) {
+                alert("Ungültige Ziel-Frequenz. Bitte überprüfe die Parameter.");
+                return;
+            }
+
+            targetToneOsc = audioCtx.createOscillator();
+            targetToneGain = audioCtx.createGain();
+
+            targetToneOsc.type = 'sine';
+            targetToneOsc.frequency.setValueAtTime(targetFreq, audioCtx.currentTime);
+
+            targetToneGain.gain.setValueAtTime(0.01, audioCtx.currentTime);
+            targetToneGain.gain.exponentialRampToValueAtTime(0.15, audioCtx.currentTime + 0.05);
+
+            targetToneOsc.connect(targetToneGain);
+            targetToneGain.connect(audioCtx.destination);
+
+            targetToneOsc.start();
+            isPlayingTone = true;
+
+            document.getElementById('toneBtnText').innerText = 'Stoppen';
+            document.getElementById('playTargetToneBtn').className = 'px-3 py-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 rounded-lg font-semibold text-xs flex items-center space-x-1.5 transition-colors';
+        }
+
+        function stopTargetTone() {
+            if (targetToneOsc && targetToneGain) {
+                targetToneGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+                setTimeout(() => {
+                    try { targetToneOsc.stop(); } catch(e) {}
+                }, 60);
+            }
+            isPlayingTone = false;
+            document.getElementById('toneBtnText').innerText = 'Zielton Abspielen';
+            document.getElementById('playTargetToneBtn').className = 'px-3 py-1 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/30 rounded-lg font-semibold text-xs flex items-center space-x-1.5 transition-colors';
+        }
+
+        function renderVisualizer(timeData, freqData) {
+            const canvas = document.getElementById('visualizerCanvas');
+            const ctx = canvas.getContext('2d');
+
+            if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
+                canvas.width = canvas.clientWidth;
+                canvas.height = canvas.clientHeight;
+            }
+
+            const W = canvas.width;
+            const H = canvas.height;
+
+            ctx.clearRect(0, 0, W, H);
+
+            // Frequency FFT Spectrum Bars
+            const barWidth = (W / freqData.length) * 2.8;
+            let x = 0;
+            ctx.fillStyle = 'rgba(6, 182, 212, 0.22)';
+            for (let i = 0; i < freqData.length; i++) {
+                const barHeight = (freqData[i] / 255) * H;
+                ctx.fillRect(x, H - barHeight, barWidth, barHeight);
+                x += barWidth + 1;
+                if (x > W) break;
+            }
+
+            // Oscilloscope Waveform Line
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#10b981';
+            ctx.beginPath();
+
+            const sliceWidth = W / timeData.length;
+            let wx = 0;
+
+            for (let i = 0; i < timeData.length; i++) {
+                const v = timeData[i];
+                const wy = (v + 1) * (H / 2);
+
+                if (i === 0) ctx.moveTo(wx, wy);
+                else ctx.lineTo(wx, wy);
+
+                wx += sliceWidth;
+            }
+            ctx.stroke();
+        }
+
+        function initSpokesData(count) {
+            spokeCount = count;
+            spokesData = [];
+            for (let i = 0; i < count; i++) {
+                spokesData.push({
+                    id: i + 1,
+                    side: (i % 2 === 0) ? 'Links' : 'Rechts',
+                    freq: 0,
+                    tensionN: 0,
+                    tensionKgf: 0
+                });
+            }
+            if (activeSpokeIndex >= count) activeSpokeIndex = 0;
+            renderSpokeTable();
+            drawWheelDiagram();
+            updateSummaryStats();
+        }
+
+        function saveActiveSpokeMeasurement() {
+            if (currentFrequency <= 0 || currentTensionN <= 0) return;
+
+            spokesData[activeSpokeIndex].freq = currentFrequency;
+            spokesData[activeSpokeIndex].tensionN = currentTensionN;
+            spokesData[activeSpokeIndex].tensionKgf = currentTensionKgf;
+
+            activeSpokeIndex = (activeSpokeIndex + 1) % spokeCount;
+
+            renderSpokeTable();
+            drawWheelDiagram();
+            updateSummaryStats();
+        }
+
+        function changeSpokeCount() {
+            const count = parseInt(document.getElementById('spokeCountSelect').value);
+            initSpokesData(count);
+        }
+
+        function renderSpokeTable() {
+            const tbody = document.getElementById('spokeTableBody');
+            tbody.innerHTML = '';
+
+            const targetLeftN = parseFloat(document.getElementById('targetLeftN').value) || 800;
+            const targetRightN = parseFloat(document.getElementById('targetRightN').value) || 1100;
+
+            const activeSpoke = spokesData[activeSpokeIndex];
+            document.getElementById('activeSpokeBadge').innerText = `#${activeSpoke.id} ${activeSpoke.side}`;
+
+            spokesData.forEach((spoke, idx) => {
+                const tr = document.createElement('tr');
+                const isActive = (idx === activeSpokeIndex);
+
+                tr.className = isActive 
+                    ? 'bg-cyan-950/60 font-semibold border-l-4 border-cyan-400 cursor-pointer hover:bg-slate-800/80 transition-colors' 
+                    : 'hover:bg-slate-900/80 cursor-pointer transition-colors';
+
+                tr.onclick = () => {
+                    activeSpokeIndex = idx;
+                    renderSpokeTable();
+                    drawWheelDiagram();
+                };
+
+                const target = spoke.side === 'Links' ? targetLeftN : targetRightN;
+                let devStr = '--';
+                let devClass = 'text-slate-500';
+
+                if (spoke.tensionN > 0) {
+                    const dev = ((spoke.tensionN - target) / target) * 100.0;
+                    const sign = dev >= 0 ? '+' : '';
+                    devStr = `${sign}${dev.toFixed(1)}%`;
+                    if (Math.abs(dev) <= 10) devClass = 'text-emerald-400 font-bold';
+                    else if (Math.abs(dev) <= 20) devClass = 'text-amber-400 font-bold';
+                    else devClass = 'text-rose-400 font-bold';
+                }
+
+                tr.innerHTML = `
+                    <td class="p-2 text-center font-bold ${isActive ? 'text-cyan-400' : 'text-slate-400'}">${spoke.id}</td>
+                    <td class="p-2"><span class="px-1.5 py-0.5 rounded text-[10px] ${spoke.side === 'Links' ? 'bg-cyan-950 text-cyan-300 border border-cyan-800' : 'bg-emerald-950 text-emerald-300 border border-emerald-800'}">${spoke.side}</span></td>
+                    <td class="p-2 text-right text-slate-200">${spoke.freq > 0 ? spoke.freq.toFixed(1) + ' Hz' : '-'}</td>
+                    <td class="p-2 text-right font-bold text-slate-100">${spoke.tensionN > 0 ? spoke.tensionN + ' N' : '-'}</td>
+                    <td class="p-2 text-right text-slate-300">${spoke.tensionKgf > 0 ? spoke.tensionKgf : '-'}</td>
+                    <td class="p-2 text-right ${devClass}">${devStr}</td>
+                    <td class="p-2 text-center">
+                        <button onclick="event.stopPropagation(); clearSpoke(${idx})" class="p-1 text-slate-500 hover:text-rose-400 transition-colors">
+                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            lucide.createIcons();
+        }
+
+        function clearSpoke(index) {
+            spokesData[index].freq = 0;
+            spokesData[index].tensionN = 0;
+            spokesData[index].tensionKgf = 0;
+            renderSpokeTable();
+            drawWheelDiagram();
+            updateSummaryStats();
+        }
+
+        function drawWheelDiagram() {
+            const canvas = document.getElementById('wheelCanvas');
+            const ctx = canvas.getContext('2d');
+            const W = canvas.width;
+            const H = canvas.height;
+            const cx = W / 2;
+            const cy = H / 2;
+            const rimRadius = (W / 2) - 22;
+            const hubRadius = rimRadius * 0.28;
+
+            ctx.clearRect(0, 0, W, H);
+
+            // Outer Rim Circle
+            ctx.beginPath();
+            ctx.arc(cx, cy, rimRadius, 0, 2 * Math.PI);
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 8;
+            ctx.stroke();
+
+            // Inner Hub Circle
+            ctx.beginPath();
+            ctx.arc(cx, cy, hubRadius, 0, 2 * Math.PI);
+            ctx.fillStyle = '#0f172a';
+            ctx.fill();
+            ctx.strokeStyle = '#06b6d4';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            const targetLeftN = parseFloat(document.getElementById('targetLeftN').value) || 800;
+            const targetRightN = parseFloat(document.getElementById('targetRightN').value) || 1100;
+
+            for (let i = 0; i < spokeCount; i++) {
+                const angle = (2 * Math.PI * i / spokeCount) - (Math.PI / 2);
+                const spoke = spokesData[i];
+                const target = spoke.side === 'Links' ? targetLeftN : targetRightN;
+
+                const x1 = cx + hubRadius * Math.cos(angle);
+                const y1 = cy + hubRadius * Math.sin(angle);
+                const x2 = cx + rimRadius * Math.cos(angle);
+                const y2 = cy + rimRadius * Math.sin(angle);
+
+                let spokeColor = '#475569';
+                let lineWidth = 1.5;
+
+                if (spoke.tensionN > 0) {
+                    const dev = Math.abs(((spoke.tensionN - target) / target) * 100.0);
+                    if (dev <= 10) spokeColor = '#10b981';
+                    else if (dev <= 20) spokeColor = '#f59e0b';
+                    else spokeColor = '#f43f5e';
+                    lineWidth = 2.5;
+                }
+
+                if (i === activeSpokeIndex) {
+                    spokeColor = '#06b6d4';
+                    lineWidth = 4;
+                }
+
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.strokeStyle = spokeColor;
+                ctx.lineWidth = lineWidth;
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.arc(x2, y2, 4, 0, 2 * Math.PI);
+                ctx.fillStyle = spokeColor;
+                ctx.fill();
+
+                if (i === activeSpokeIndex) {
+                    ctx.beginPath();
+                    ctx.arc(x2, y2, 8, 0, 2 * Math.PI);
+                    ctx.strokeStyle = '#06b6d4';
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+                }
+            }
+        }
+
+        document.getElementById('wheelCanvas').addEventListener('click', function(e) {
+            const rect = this.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const clickY = e.clientY - rect.top;
+            const W = this.width;
+            const H = this.height;
+            const cx = W / 2;
+            const cy = H / 2;
+            const rimRadius = (W / 2) - 22;
+
+            let closestIndex = -1;
+            let minDistance = 9999;
+
+            for (let i = 0; i < spokeCount; i++) {
+                const angle = (2 * Math.PI * i / spokeCount) - (Math.PI / 2);
+                const nodeX = cx + rimRadius * Math.cos(angle);
+                const nodeY = cy + rimRadius * Math.sin(angle);
+
+                const dist = Math.hypot(clickX - nodeX, clickY - nodeY);
+                if (dist < minDistance) {
+                    minDistance = dist;
+                    closestIndex = i;
+                }
+            }
+
+            if (closestIndex !== -1 && minDistance < 35) {
+                activeSpokeIndex = closestIndex;
+                renderSpokeTable();
+                drawWheelDiagram();
+            }
+        });
+
+        function updateSummaryStats() {
+            const leftSpokes = spokesData.filter(s => s.side === 'Links' && s.tensionN > 0);
+            const rightSpokes = spokesData.filter(s => s.side === 'Rechts' && s.tensionN > 0);
+
+            document.getElementById('leftCountBadge').innerText = `${leftSpokes.length}/${spokeCount/2}`;
+            if (leftSpokes.length > 0) {
+                const leftVals = leftSpokes.map(s => s.tensionN);
+                const leftAvg = Math.round(leftVals.reduce((a,b) => a+b, 0) / leftVals.length);
+                const leftMin = Math.min(...leftVals);
+                const leftMax = Math.max(...leftVals);
+                const leftDev = Math.round(((leftMax - leftMin) / (2 * leftAvg)) * 100);
+
+                document.getElementById('leftAvgN').innerText = `${leftAvg} N`;
+                document.getElementById('leftMinMax').innerText = `${leftMin} / ${leftMax} N`;
+                document.getElementById('leftDevPercent').innerText = `± ${leftDev}%`;
+            } else {
+                document.getElementById('leftAvgN').innerText = '0 N';
+                document.getElementById('leftMinMax').innerText = '-- / -- N';
+                document.getElementById('leftDevPercent').innerText = '± 0%';
+            }
+
+            document.getElementById('rightCountBadge').innerText = `${rightSpokes.length}/${spokeCount/2}`;
+            if (rightSpokes.length > 0) {
+                const rightVals = rightSpokes.map(s => s.tensionN);
+                const rightAvg = Math.round(rightVals.reduce((a,b) => a+b, 0) / rightVals.length);
+                const rightMin = Math.min(...rightVals);
+                const rightMax = Math.max(...rightVals);
+                const rightDev = Math.round(((rightMax - rightMin) / (2 * rightAvg)) * 100);
+
+                document.getElementById('rightAvgN').innerText = `${rightAvg} N`;
+                document.getElementById('rightMinMax').innerText = `${rightMin} / ${rightMax} N`;
+                document.getElementById('rightDevPercent').innerText = `± ${rightDev}%`;
+            } else {
+                document.getElementById('rightAvgN').innerText = '0 N';
+                document.getElementById('rightMinMax').innerText = '-- / -- N';
+                document.getElementById('rightDevPercent').innerText = '± 0%';
+            }
+        }
+
+        function exportCSV() {
+            const wheelName = document.getElementById('wheelName').value || 'Laufrad';
+            let csvContent = "data:text/csv;charset=utf-8,Speiche;Seite;Frequenz_Hz;Spannung_N;Spannung_kgf\n";
+
+            spokesData.forEach(s => {
+                csvContent += `${s.id};${s.side};${s.freq};${s.tensionN};${s.tensionKgf}\n`;
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `${wheelName.replace(/\s+/g, '_')}_Spannungsprotokoll.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function resetWheelLog() {
+            initSpokesData(spokeCount);
+        }
+
+        window.onload = function() {
+            lucide.createIcons();
+
+            // Check HTTPS Status
+            if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+                document.getElementById('httpsWarning').classList.remove('hidden');
+            }
+
+            // Global Click listener to unlock Audio Context
+            document.body.addEventListener('click', () => {
+                if (audioCtx && audioCtx.state === 'suspended') {
+                    audioCtx.resume().then(() => updateAudioContextDisplay());
+                }
+            }, { once: true });
+
+            applyPreset();
+            initSpokesData(32);
+        };
+    </script>
+</body>
+</html>
